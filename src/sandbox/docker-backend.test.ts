@@ -188,6 +188,34 @@ describe("DockerBackend.run", () => {
     expect(binds).toContain("/home/user/.sandy/test-session/output:/workspace/output:rw")
   })
 
+  test("sets ExtraHosts host-gateway alias on linux", async () => {
+    const { docker, createContainerCalls } = makeDockerFake()
+    const backend = new DockerBackend(docker, fakeBuildContext)
+    const originalPlatform = process.platform
+    Object.defineProperty(process, "platform", { value: "linux" })
+    try {
+      await backend.run(baseRunOpts, new OutputHandler(() => {}))
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform })
+    }
+    const extraHosts = (createContainerCalls[0]?.opts as ContainerOpts)?.HostConfig?.ExtraHosts
+    expect(extraHosts).toEqual(["host.docker.internal:host-gateway"])
+  })
+
+  test("omits ExtraHosts on non-linux platforms", async () => {
+    const { docker, createContainerCalls } = makeDockerFake()
+    const backend = new DockerBackend(docker, fakeBuildContext)
+    const originalPlatform = process.platform
+    Object.defineProperty(process, "platform", { value: "darwin" })
+    try {
+      await backend.run(baseRunOpts, new OutputHandler(() => {}))
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform })
+    }
+    const extraHosts = (createContainerCalls[0]?.opts as ContainerOpts)?.HostConfig?.ExtraHosts
+    expect(extraHosts).toEqual([])
+  })
+
   test("forwards [-->-prefixed stdout lines as progress", async () => {
     const { docker } = makeDockerFake({
       containerConfig: { stdoutLines: ["[-->  compiling...", "normal output line"] },

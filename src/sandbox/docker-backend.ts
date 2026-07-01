@@ -162,9 +162,11 @@ export class DockerBackend implements Backend {
       Env: Object.entries(env).map(([k, v]) => `${k}=${v}`),
       HostConfig: {
         Binds: [`${scriptDirPath}:${VM_SCRIPTS_DIR}:ro`, `${outputDirPath}:${VM_OUTPUT_DIR}:rw`],
-        // host.docker.internal resolves on macOS/Windows by default; on Linux the
-        // host-gateway alias is required to make it resolve to the Docker bridge IP.
-        ExtraHosts: ["host.docker.internal:host-gateway"],
+        // host.docker.internal resolves correctly on macOS/Windows by default. On
+        // Linux it does not resolve at all, so the host-gateway alias is required
+        // there. Forcing the alias on macOS instead resolves to the bridge gateway,
+        // which cannot reach services bound to the host's loopback interface.
+        ExtraHosts: process.platform === "linux" ? ["host.docker.internal:host-gateway"] : [],
         // No network restrictions: Docker does not support domain-based allow-lists
         // without a custom DNS proxy. This is a known trade-off vs the Shuru backend,
         // which restricts egress to *.amazonaws.com and *.aws.amazon.com.
